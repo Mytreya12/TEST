@@ -5,7 +5,7 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-// ✅ Health Check Route (for Render root)
+// ✅ Health Check Route
 app.get("/", (req, res) => {
   res.send("✅ Dataverse API is running!");
 });
@@ -23,6 +23,35 @@ async function getToken() {
   );
   return response.data.access_token;
 }
+
+// 📥 GET with query params: select, filter (using req.query)
+app.get("/getData", async (req, res) => {
+  try {
+    const { table, select, filter } = req.query;
+    if (!table) return res.status(400).json({ error: "Missing 'table' query param" });
+
+    const token = await getToken();
+
+    let url = `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}`;
+    const query = [];
+
+    if (select) query.push(`$select=${select}`);
+    if (filter) query.push(`$filter=${filter}`);
+
+    if (query.length) url += "?" + query.join("&");
+
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // 📤 POST - Create Record
 app.post("/postToDataverse", async (req, res) => {
@@ -42,28 +71,6 @@ app.post("/postToDataverse", async (req, res) => {
       }
     );
     res.json({ success: true, data: response.data });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 📥 GET - Retrieve Records
-app.post("/getFromDataverse", async (req, res) => {
-  try {
-    const { table } = req.body;
-    if (!table) return res.status(400).json({ error: "Missing table." });
-
-    const token = await getToken();
-    const response = await axios.get(
-      `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    res.json({ success: true, data: response.data.value });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: err.message });
@@ -118,6 +125,6 @@ app.delete("/deleteFromDataverse", async (req, res) => {
   }
 });
 
-// ✅ Start Server (Use Render's assigned port if available)
+// ✅ Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API running on port ${PORT}`));
