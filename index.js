@@ -5,34 +5,33 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-// ✅ Health Check Route
+// ✅ Health Check
 app.get("/", (req, res) => {
   res.send("✅ Dataverse API is running!");
 });
 
-// 🔐 Generate Access Token for Dataverse
+// 🔐 Get Access Token
 async function getToken() {
   const response = await axios.post(
     `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`,
     new URLSearchParams({
       client_id: process.env.CLIENT_ID,
       client_secret: process.env.CLIENT_SECRET,
-      scope: "https://your-org.crm8.dynamics.com/.default",
+      scope: `${process.env.RESOURCE_URL}/.default`,
       grant_type: "client_credentials",
     })
   );
   return response.data.access_token;
 }
 
-// 📥 GET with query params: select, filter (using req.query)
+// 📥 GET - Read data with optional $select and $filter
 app.get("/getData", async (req, res) => {
   try {
     const { table, select, filter } = req.query;
     if (!table) return res.status(400).json({ error: "Missing 'table' query param" });
 
     const token = await getToken();
-
-    let url = `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}`;
+    let url = `${process.env.RESOURCE_URL}/api/data/v9.2/${table}`;
     const query = [];
 
     if (select) query.push(`$select=${select}`);
@@ -49,11 +48,12 @@ app.get("/getData", async (req, res) => {
 
     res.json(response.data);
   } catch (err) {
+    console.error(err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📤 POST - Create Record
+// 📤 POST - Create record
 app.post("/postToDataverse", async (req, res) => {
   try {
     const { table, data } = req.body;
@@ -61,7 +61,7 @@ app.post("/postToDataverse", async (req, res) => {
 
     const token = await getToken();
     const response = await axios.post(
-      `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}`,
+      `${process.env.RESOURCE_URL}/api/data/v9.2/${table}`,
       data,
       {
         headers: {
@@ -77,15 +77,15 @@ app.post("/postToDataverse", async (req, res) => {
   }
 });
 
-// ✏️ PATCH - Update Record by ID
+// ✏️ PATCH - Update record by ID
 app.patch("/updateDataverse", async (req, res) => {
   try {
     const { table, id, data } = req.body;
-    if (!table || !id || !data) return res.status(400).json({ error: "Missing table, id or data." });
+    if (!table || !id || !data) return res.status(400).json({ error: "Missing table, id, or data." });
 
     const token = await getToken();
     await axios.patch(
-      `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}(${id})`,
+      `${process.env.RESOURCE_URL}/api/data/v9.2/${table}(${id})`,
       data,
       {
         headers: {
@@ -102,7 +102,7 @@ app.patch("/updateDataverse", async (req, res) => {
   }
 });
 
-// 🗑️ DELETE - Remove Record by ID
+// 🗑️ DELETE - Delete record by ID
 app.delete("/deleteFromDataverse", async (req, res) => {
   try {
     const { table, id } = req.body;
@@ -110,7 +110,7 @@ app.delete("/deleteFromDataverse", async (req, res) => {
 
     const token = await getToken();
     await axios.delete(
-      `https://your-org.crm8.dynamics.com/api/data/v9.2/${table}(${id})`,
+      `${process.env.RESOURCE_URL}/api/data/v9.2/${table}(${id})`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -125,6 +125,6 @@ app.delete("/deleteFromDataverse", async (req, res) => {
   }
 });
 
-// ✅ Start Server
+// 🚀 Start Server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ API running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 API is live on port ${PORT}`));
